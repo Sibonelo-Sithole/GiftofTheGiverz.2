@@ -1,7 +1,5 @@
-# ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+# GiftoftheGiverz - Automated CI Pipeline
 
 trigger:
 - master
@@ -15,20 +13,57 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-- task: NuGetToolInstaller@1
 
+# 1. Install NuGet
+- task: NuGetToolInstaller@1
+  displayName: 'Install NuGet'
+
+# 2. Restore dependencies
 - task: NuGetCommand@2
+  displayName: 'Restore NuGet Dependencies'
   inputs:
+    command: 'restore'
     restoreSolution: '$(solution)'
 
+# 3. Build ASP.NET solution
 - task: VSBuild@1
+  displayName: 'Build GiftoftheGiverz Solution'
   inputs:
     solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
+    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(Build.ArtifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
 
-- task: VSTest@2
+# 4. Install Visual Studio Test Platform
+- task: VisualStudioTestPlatformInstaller@1
+  displayName: 'Install Visual Studio Test Platform'
   inputs:
+    packageFeedSelector: 'nugetOrg'
+    versionSelector: 'latestStable'
+
+# 5. Run automated unit tests
+- task: VSTest@2
+  displayName: 'Run GiftoftheGiverz Unit Tests'
+  inputs:
+    testSelector: 'testAssemblies'
+    testAssemblyVer2: |
+      **\GiftoftheGiverz.Tests.dll
+      !**\obj\**
+    searchFolder: '$(System.DefaultWorkingDirectory)'
+    vstestLocationMethod: 'version'
+    vsTestVersion: 'toolsInstaller'
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
+    failOnMinTestsNotRun: true
+    minimumExpectedTests: '1'
+    publishRunAttachments: true
+
+# 6. Publish test results
+- task: PublishTestResults@2
+  displayName: 'Publish Unit Test Results'
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: 'VSTest'
+    testResultsFiles: '**/*.trx'
+    searchFolder: '$(Agent.TempDirectory)'
+    failTaskOnFailedTests: true
